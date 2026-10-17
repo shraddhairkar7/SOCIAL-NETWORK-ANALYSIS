@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Social Network Analysis</title>
+<style>
+  :root {
+    --paper:#f6f5f1; --panel:#ffffff; --ink:#1c2321; --mute:#667069; --line:#dcdad2;
+    --seq:#b4541f; --par:#1f6f5c; --accent:#1f6f5c; --screen:#16201d; --screen-ink:#cfe8dd;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.5 "Segoe UI", system-ui, sans-serif; }
+  .wrap { max-width:980px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { font-size:26px; margin:0 0 4px; letter-spacing:-.01em; }
+  .sub { color:var(--mute); margin:0 0 26px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:18px; }
+  .controls { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-end; }
+  label.l { display:block; font-size:13px; color:var(--mute); margin-bottom:6px; }
+  select { font:inherit; padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); min-width:230px; }
+  .toggle { display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .toggle label { padding:9px 16px; cursor:pointer; font-weight:600; }
+  .toggle input { position:absolute; opacity:0; }
+  .toggle label:has(input:checked) { background:var(--ink); color:#fff; }
+  .toggle label:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:-2px; }
+  button { font:inherit; font-weight:600; padding:10px 20px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+  button.alt { background:#fff; color:var(--accent); }
+  button:hover:not(:disabled) { filter:brightness(1.1); }
+  button:disabled { opacity:.55; cursor:wait; }
+  button:focus-visible, select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .actions { display:flex; gap:10px; }
+
+  .readout { background:var(--screen); color:var(--screen-ink); border-radius:10px; padding:22px 24px; font-family:Consolas,"Courier New",monospace; }
+  .readout .cmd { color:#8fb3a3; font-size:13px; margin-bottom:12px; word-break:break-all; }
+  .readout .title { letter-spacing:.12em; font-size:14px; color:#8fb3a3; }
+  .readout .big { font-size:clamp(34px,7vw,56px); font-weight:700; margin:6px 0 2px; color:#fff; }
+  .readout .big small { font-size:.4em; color:#8fb3a3; font-weight:400; margin-left:8px; }
+  .facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 24px; margin-top:16px; font-size:14px; }
+  .facts span { color:#8fb3a3; display:block; font-size:12px; }
+
+  .two { display:grid; grid-template-columns:3fr 2fr; gap:18px; }
+  @media (max-width:760px){ .two { grid-template-columns:1fr; } }
+  h2 { font-size:16px; margin:0 0 12px; }
+  table { width:100%; border-collapse:collapse; font-size:14.5px; }
+  th,td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--mute); font-weight:600; font-size:13px; }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+  .bar { height:8px; background:var(--accent); border-radius:4px; }
+  pre { margin:0; background:#f1f0eb; border-radius:8px; padding:12px; font-size:12.5px; overflow:auto; max-height:330px; }
+  .note { color:var(--mute); font-size:13.5px; margin:10px 0 0; }
+  .err { background:#fdeceb; border:1px solid #e9b4b0; color:#8a2a22; padding:12px 14px; border-radius:8px; white-space:pre-wrap; margin-bottom:18px; }
+  .hide { display:none; }
+  .cmpbar { display:flex; align-items:center; gap:10px; }
+  .cmpbar .track { flex:1; background:#eceae3; border-radius:4px; height:10px; }
+  .cmpbar .fill { height:10px; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Social Network Analysis</h1>
+  <p class="sub">Computational System for analyzing large social networks. <span id="cores"></span></p>
+
+  <div class="panel">
+    <div class="controls">
+      <div>
+        <label class="l" for="dataset">Dataset</label>
+        <select id="dataset"></select>
+      </div>
+      <div>
+        <span class="l" style="display:block;font-size:13px;color:var(--mute);margin-bottom:6px">Version</span>
+        <div class="toggle">
+          <label><input type="radio" name="mode" value="seq" checked>Sequential</label>
+          <label><input type="radio" name="mode" value="par">Parallel</label>
+        </div>
+      </div>
+      <div id="thrBox" class="hide">
+        <label class="l" for="threads">Threads</label>
+        <select id="threads" style="min-width:90px"></select>
+      </div>
+      <div class="actions">
+        <button id="run">Run</button>
+        <button id="cmp" class="alt">Compare all</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="error" class="err hide"></div>
+
+  <div id="out" class="hide">
+    <div class="readout" id="readout"></div>
+    <div class="two" style="margin-top:18px">
+      <div class="panel" style="margin:0"><h2>Top 10 connected users</h2><table id="top"></table></div>
+      <div class="panel" style="margin:0"><h2>Terminal output</h2><pre id="raw"></pre></div>
+    </div>
+  </div>
+
+  <div id="cmpPanel" class="panel hide" style="margin-top:18px">
+    <h2>Comparison on <span id="cmpName"></span></h2>
+    <table id="cmpTable"></table>
+    <p class="note">Each row is one real run of the C program; the time is the value the program prints. Speedup = sequential time / parallel time. Each time is the median of 5 timed runs (after a warm-up), so repeated runs differ only slightly. File loading is not timed.</p>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const mode = () => document.querySelector("input[name=mode]:checked").value;
+const showErr = m => { $("error").textContent = m; $("error").classList.toggle("hide", !m); };
+const fmt = n => Number(n).toLocaleString();
+
+async function post(body) {
+  const r = await fetch("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || "Run failed");
+  return j;
+}
+function lock(on) { ["run","cmp"].forEach(i => $(i).disabled = on); }
+
+function render(r) {
+  const par = r.mode === "par";
+  $("readout").innerHTML = `
+    <div class="cmd">$ ${r.command}</div>
+    <div class="title">${par ? "PARALLEL" : "SEQUENTIAL"} SOCIAL NETWORK</div>
+    <div class="big">${r.seconds}<small>seconds</small></div>
+    <div>Execution time</div>
+    <div class="facts">
+      <div><span>Users</span>${fmt(r.users)}</div>
+      <div><span>Relationships</span>${fmt(r.relationships)}</div>
+      ${par ? `<div><span>OpenMP threads</span>${r.threads}</div>` : ""}
+      <div><span>Connected components</span>${r.components}</div>
+      <div><span>Largest component</span>${fmt(r.largest)} users</div>
+      <div><span>Triangles</span>${fmt(r.triangles)}</div>
+      <div><span>Clustering coeff.</span>${r.clustering}</div>
+      <div><span>Avg shortest path</span>${r.avgpath}</div>
+      <div><span>Est. diameter</span>${r.diameter}</div>
+    </div>`;
+  const max = Math.max(...r.top.map(t => t.connections), 1);
+  $("top").innerHTML = "<tr><th>Rank</th><th>User</th><th class='n'>Connections</th><th style='width:30%'></th></tr>" +
+    r.top.map(t => `<tr><td>${t.rank}</td><td>${t.user}</td><td class="n">${fmt(t.connections)}</td><td><div class="bar" style="width:${100*t.connections/max}%"></div></td></tr>`).join("");
+  $("raw").textContent = r.raw.trim();
+  $("out").classList.remove("hide");
+}
+
+$("run").onclick = async () => {
+  showErr(""); lock(true); $("run").textContent = "Running…";
+  try { render(await post({ mode:mode(), dataset:$("dataset").value, threads:+$("threads").value })); }
+  catch (e) { showErr(e.message); }
+  $("run").textContent = "Run"; lock(false);
+};
+
+$("cmp").onclick = async () => {
+  showErr(""); lock(true); $("cmp").textContent = "Comparing…";
+  const ds = $("dataset").value, counts = [...$("threads").options].map(o => +o.value);
+  $("cmpName").textContent = ds.replace(/^data\//, "");
+  $("cmpPanel").classList.remove("hide");
+  try {
+    const rows = [await post({ mode:"seq", dataset:ds })];
+    for (const t of counts) rows.push(await post({ mode:"par", dataset:ds, threads:t }));
+    const base = parseFloat(rows[0].seconds), max = Math.max(...rows.map(r => parseFloat(r.seconds)));
+    $("cmpTable").innerHTML = "<tr><th>Version</th><th class='n'>Execution time (s)</th><th class='n'>Speedup</th><th style='width:34%'></th></tr>" +
+      rows.map(r => { const s = parseFloat(r.seconds), sp = base / s, seq = r.mode === "seq";
+        return `<tr><td>${seq ? "Sequential" : "Parallel, " + r.threads + (r.threads == 1 ? " thread" : " threads")}</td><td class="n">${r.seconds}</td><td class="n">${seq ? "–" : sp.toFixed(2) + "×"}</td>
+        <td><div class="cmpbar"><div class="track"><div class="fill" style="width:${100*s/max}%;background:${seq ? "var(--seq)" : "var(--par)"}"></div></div></div></td></tr>`; }).join("");
+  } catch (e) { showErr(e.message); }
+  $("cmp").textContent = "Compare all"; lock(false);
+};
+
+document.querySelectorAll("input[name=mode]").forEach(r => r.onchange = () => $("thrBox").classList.toggle("hide", mode() !== "par"));
+
+(async () => {
+  const info = await (await fetch("/api/info")).json();
+  $("cores").textContent = `This computer has ${info.cores} logical core${info.cores == 1 ? "" : "s"}.`;
+  $("dataset").innerHTML = info.datasets.map(d => `<option value="${d.path}">${d.path.replace(/^data\//, "")}  (${fmt(d.kb)} KB)</option>`).join("");
+  const opts = [...new Set([2, 4, 8, info.cores].filter(n => n >= 2 && n <= Math.max(2, info.cores)))].sort((a,b) => a-b);
+  $("threads").innerHTML = opts.map(n => `<option>${n}</option>`).join("");
+  $("threads").value = opts[opts.length-1];
+  if (!info.datasets.length) showErr("No .txt datasets found in the data/ folder.");
+})();
+</script>
+</body>
+</html>
